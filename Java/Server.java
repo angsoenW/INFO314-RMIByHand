@@ -1,57 +1,46 @@
 import java.io.*;
+import java.lang.reflect.*;
 import java.net.*;
 
 public class Server {
 
-    public static final int PORT = 10314;
-
     public static void main(String[] args) {
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Server is running on port " + PORT);
-
+        try (ServerSocket serverSocket = new ServerSocket(10314)) {
             while (true) {
-                try (Socket clientSocket = serverSocket.accept();
-                     ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-                     ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
+                try (Socket socket = serverSocket.accept();
+                
+                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+                        
 
                     String methodName = (String) in.readObject();
-                    Object result;
+                    Object[] methodArgs = (Object[]) in.readObject();
+                    Method method = Server.class.getMethod(methodName, getArgTypes(methodArgs));
 
-                    switch (methodName) {
-                        case "add":
-                            int lhs = in.readInt();
-                            int rhs = in.readInt();
-                            result = add(lhs, rhs);
-                            break;
-                        case "divide":
-                            int num = in.readInt();
-                            int denom = in.readInt();
-                            try {
-                                result = divide(num, denom);
-                            } catch (ArithmeticException e) {
-                                out.writeObject(e);
-                                continue;
-                            }
-                            break;
-                        case "echo":
-                            String message = (String) in.readObject();
-                            result = echo(message);
-                            break;
-                        default:
-                            throw new IllegalArgumentException("Invalid method name: " + methodName);
+                    try {
+                        Object result = method.invoke(null, methodArgs);
+                        out.writeObject(result);
+                    } catch (IllegalAccessException | InvocationTargetException e) {
+                        out.writeObject(e.getCause());
                     }
-
-                    out.writeObject(result);
-
-                } catch (IOException | ClassNotFoundException e) {
-                    e.printStackTrace();
+                } catch (IOException | ClassNotFoundException | NoSuchMethodException e) {
+                    System.out.println("Error: Unable to process the client request.");
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Error: Unable to start the server.");
         }
     }
 
+    private static Class<?>[] getArgTypes(Object[] args) {
+        Class<?>[] argTypes = new Class<?>[args.length];
+        for (int i = 0; i < args.length; i++) {
+            argTypes[i] = args[i].getClass();
+        }
+        return argTypes;
+    }
+
+    
     // Do not modify any code below tihs line
     // --------------------------------------
     public static String echo(String message) { 
@@ -66,4 +55,5 @@ public class Server {
 
         return num / denom;
     }
+ 
 }
