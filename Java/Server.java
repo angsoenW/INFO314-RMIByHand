@@ -1,59 +1,66 @@
 import java.io.*;
-import java.lang.reflect.*;
 import java.net.*;
+
 
 public class Server {
 
+
+
     public static void main(String[] args) {
-        try (ServerSocket serverSocket = new ServerSocket(10314)) {
+
+    int port = 10314;
+
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Server listening on port " + port);
+
             while (true) {
-                try (Socket socket = serverSocket.accept();
-                
-                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+                try (Socket clientSocket = serverSocket.accept();
+                     ObjectInputStream ois = new ObjectInputStream(clientSocket.getInputStream());
+                     ObjectOutputStream oos = new ObjectOutputStream(clientSocket.getOutputStream())) {
+
+                    String methodName = (String) ois.readObject();
+                    Object[] methodArgs = (Object[]) ois.readObject();
+
+                    Object result;
+
+                    if (methodName.equals("add")) {
+                        result = add((int) methodArgs[0], (int) methodArgs[1]);
+                    } else if (methodName.equals("divide")) {
+                        try {
+                            result = divide((int) methodArgs[0], (int) methodArgs[1]);
+                        } catch (ArithmeticException e) {
+                            result = -1;
+                        }
                         
-
-                    String methodName = (String) in.readObject();
-                    Object[] methodArgs = (Object[]) in.readObject();
-                    Method method = Server.class.getMethod(methodName, getArgTypes(methodArgs));
-
-                    try {
-                        Object result = method.invoke(null, methodArgs);
-                        out.writeObject(result);
-                    } catch (IllegalAccessException | InvocationTargetException e) {
-                        out.writeObject(e.getCause());
+                    } else if (methodName.equals("echo")) {
+                        result = echo((String) methodArgs[0]);
+                    } else {
+                        result = "Error: unknown method";
                     }
-                } catch (IOException | ClassNotFoundException | NoSuchMethodException e) {
-                    System.out.println("Error: Unable to process the client request.");
+
+                    oos.writeObject(result);
                 }
             }
-        } catch (IOException e) {
-            System.out.println("Error: Unable to start the server.");
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
 
-    private static Class<?>[] getArgTypes(Object[] args) {
-        Class<?>[] argTypes = new Class<?>[args.length];
-        for (int i = 0; i < args.length; i++) {
-            argTypes[i] = args[i].getClass();
-        }
-        return argTypes;
-    }
-
-    
     // Do not modify any code below tihs line
     // --------------------------------------
-    public static String echo(String message) { 
+    public static String echo(String message) {
         return "You said " + message + "!";
     }
+
     public static int add(int lhs, int rhs) {
         return lhs + rhs;
     }
+
     public static int divide(int num, int denom) {
         if (denom == 0)
             throw new ArithmeticException();
 
         return num / denom;
     }
- 
+
 }
